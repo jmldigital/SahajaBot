@@ -60,31 +60,31 @@ events_schedule = {
     "Tuesday": {
         "🕐": time(17, 30),
         "📍": "Студия Йоги ОЙЙО, ул. Хользунова, 38/7",
-        "🧘🏻‍♀️": "Новичковые занятия",
+        "👼": "Новичковые занятия",
         "🧘🏻‍♀️": "практика медитации"
     },
     "Thursday": {
         "🕐": time(17, 00),
         "📍": "Танцевальной пространство АНДЭР, ул. Бакунина, 2А (этаж 1)",
-        "🧘🏻‍♀️": "Новичковые занятия",
+        "👼": "Новичковые занятия",
         "🧘🏻‍♀️": "Практика медитации"
     },
     "Friday": {
         "🕐": time(19, 0),
         "📍": "Офис возле Галереи Чижова, ул. Никитинская, 42 оф. 515",
-        "🧘🏻‍♀️": "Занятия для продолжающих",
+        "🐣": "Занятия для продолжающих",
         "🧘🏻‍♀️": "Практика медитации, методики очистки"
     },
     "Saturday": {
         "🕐": time(16, 0),
         "📍": "Офис, ул. 20-летия Октября, 59 оф.317",
-        "🧘🏻‍♀️": "Занятия для новичков",
+        "👼": "Занятия для новичков",
         "🧘🏻‍♀️": "Практика медитации"
     },
     "Saturday": {
         "🕐": time(17, 0),
         "📍": "Офис, ул. 20-летия Октября, 59 оф.317",
-        "🧘🏻‍♀️": "Занятия для продолжающих",
+        "🐣": "Занятия для продолжающих",
         "🧘🏻‍♀️": "Практика медитации, методики очистки"
     }
 
@@ -116,7 +116,6 @@ def find_nearest_day(current_day_index, schedule_indices):
 
     # Получаем время события
     event_time = events_schedule[nearest_day_name]["🕐"]
-    # event_datetime_today = datetime.combine(current_datetime.date(), event_time)
 
     # Сравниваем текущее время с временем события
     if current_datetime.time() > event_time:
@@ -124,9 +123,7 @@ def find_nearest_day(current_day_index, schedule_indices):
         nearest_day_index = min(schedule_indices, key=lambda day_index: (day_index - (current_day_index+1)) % 7)
         # Перенаправляем день недели 
         nearest_day_name = list(calendar.day_name)[nearest_day_index]
-        event_time = events_schedule[nearest_day_name]["🕐"]
-        # days_difference = (nearest_day_index - current_day_index + 7) % 7
-    
+        event_time = events_schedule[nearest_day_name]["🕐"]    
 
     # Calculate the difference in days to the nearest given day
     days_difference = (nearest_day_index - current_day_index + 7) % 7
@@ -251,9 +248,9 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update_spreadsheet_data(context.application)    
         await context.bot.send_message(
             chat_id=user_id,
-            text=f"Здорово! Будем ждать. Отправим вам напоминание за 4 часа до мероприятия"
+            text=f"Здорово! Будем ждать. Ближайшее мероприятие пройдет в \n 🗓 {nearest_day} через {hours} часов, {minutes} минут. Отправим вам напоминание за 4 часа до мероприятия"
         )
-        # await send_notifications_to_group_try(user_name)
+        await send_notifications_to_group_try(user_name)
         await context.bot.send_sticker(chat_id=user_id, sticker=yoga_sticker_id_love)
     
     if choice == "confirm":
@@ -265,8 +262,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             chat_id=user_id,
             text=f"Ваша Кундалини поднимается, мы Вас ждем через {hours} часов, {minutes} минут по адресу {adress_line}!",
         )
-        # await bot.send_animation(user_id, gif, caption = 'Loading...')
-        # await send_notifications_to_group_confirm(user_name)
+
+        await send_notifications_to_group_confirm(user_name)
         await context.bot.send_sticker(chat_id=user_id, sticker=yoga_sticker_id)
 
     if choice == "sorry":
@@ -277,7 +274,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             chat_id=user_id,
             text=f"Ничего страшного, приходите на следующее занятие, мы Вас оповестим о нем заранее!"
         )
-        # await send_notifications_to_group_sorry(user_name)
+        await send_notifications_to_group_sorry(user_name)
 
 
 
