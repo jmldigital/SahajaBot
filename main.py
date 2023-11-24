@@ -78,14 +78,8 @@ events_schedule = {
     "Saturday": {
         "🕐": time(16, 0),
         "📍": "Офис, ул. 20-летия Октября, 59 оф.317",
-        "👼": "Занятия для новичков",
+        "👼": "16:00 - Занятия для новичков, 17:00 - занятия для продолжающих",
         "🧘🏻‍♀️": "Практика медитации"
-    },
-    "Saturday": {
-        "🕐": time(17, 0),
-        "📍": "Офис, ул. 20-летия Октября, 59 оф.317",
-        "🐣": "Занятия для продолжающих",
-        "🧘🏻‍♀️": "Практика медитации, методики очистки"
     }
 
 }
@@ -348,7 +342,7 @@ async def get_telegram_user_ids():
     filtered_users = [user_id for user_id, agrees in zip(user_ids, user_agrees) if agrees.lower() == 'true']
 
     print("получаем всех пользователей из таблицы" ,user_ids)
-    print("получаем всех пользователей? кто собирается придти", filtered_users)
+    print("получаем всех пользователей, кто собирается придти", filtered_users)
     return user_ids,filtered_users
 
 
@@ -367,8 +361,6 @@ async def send_messages_to_users():
                 # Send the reminder message
                 await bot.send_message(user_id, f"\n Напоминание на {nearest_day}. \n Мероприятие начнется через {hours} часов и {minutes} минут", reply_markup=reply_markup)
                 print(f"Напоминание отправлено пользователю {user_id}")
-            # Set the flag to True to indicate that the message has been sent
-            # message_sent = True
     except Exception as e:
         print(f"Произошла ошибка при отправке сообщения: {e}")
 
@@ -381,19 +373,15 @@ async def send_reminder_to_users():
     print('время до ближайшего мероприятия для уверенных-',hours)
 
     try:
-        # Check if the message has already been sent
-        if ShortTimeLimit[0] <= hours < ShortTimeLimit[1]:
+         if ShortTimeLimit[0] <= hours < ShortTimeLimit[1]:
             user_ids,filtered_users = await get_telegram_user_ids()
             print('пользователи, кому отправляются сообщения',user_ids)
-            for user_id in filtered_users:
+            for user_id in user_ids:
                 # Send the reminder message
                 await bot.send_message(user_id, f"\n Напоминание на {nearest_day}. \n Мероприятие начнется через {hours} часов и {minutes} минут", reply_markup=reply_markup)
                 print(f"Напоминание отправлено пользователю {user_id}")
-            # Set the flag to True to indicate that the message has been sent
-            # message_sent = True
     except Exception as e:
         print(f"Произошла ошибка при отправке сообщения: {e}")
-    # Add a delay before checking again
 
 
 
