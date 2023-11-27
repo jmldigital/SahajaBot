@@ -33,7 +33,7 @@ env_path = '.env'
 
 send_messages_task = None
 
-sendTryTime = 600*4
+sendTryTime = 550*6
 BigTimeLimit = [23,24]
 ShortTimeLimit = [3,4]
 # gif = open('gif.gif', 'rb')
@@ -58,89 +58,112 @@ bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
 events_schedule = {
     "Tuesday": {
+        "Занятия для новичков": {
         "🕐": time(17, 30),
         "📍": "Студия Йоги ОЙЙО, ул. Хользунова, 38/7",
-        "👼": "Новичковые занятия",
-        "🧘🏻‍♀️": "практика медитации"
+        "🧘🏻‍♀️": "Практика медитации"
+        }
     },
+
     "Thursday": {
+        "Занятия для новичков": {
         "🕐": time(17, 00),
         "📍": "Танцевальной пространство АНДЭР, ул. Бакунина, 2А (этаж 1)",
-        "👼": "Новичковые занятия",
         "🧘🏻‍♀️": "Практика медитации"
+        }
     },
+
     "Friday": {
+        "Занятия для продолжающих": {
         "🕐": time(19, 0),
         "📍": "Офис возле Галереи Чижова, ул. Никитинская, 42 оф. 515",
-        "🐣": "Занятия для продолжающих",
         "🧘🏻‍♀️": "Практика медитации, методики очистки"
+        }
     },
+
     "Saturday": {
-        "🕐": time(16, 0),
+        "Занятия для новичков": {
+        "🕐": time(19, 0),
         "📍": "Офис, ул. 20-летия Октября, 59 оф.317",
-        "👼": "16:00 - Занятия для новичков, 17:00 - занятия для продолжающих",
         "🧘🏻‍♀️": "Практика медитации"
+        },
+
+        "Занятия для продолжающих": {
+        "🕐": time(17, 0),
+        "📍": "Офис, ул. 20-летия Октября, 59 оф.317",
+        "🧘🏻‍♀️": "Практика медитации, методики очистки"
+        }
+
     }
 
 }
 
+def translate_days_to_russian(english_day):
+    days_translation = {
+        'Monday': 'Понедельник',
+        'Tuesday': 'Вторник',
+        'Wednesday': 'Среда',
+        'Thursday': 'Четверг',
+        'Friday': 'Пятница',
+        'Saturday': 'Суббота',
+        'Sunday': 'Воскресенье'
+    }
+
+    return days_translation.get(english_day, english_day)
+
+
+def get_day_index(day_name):
+    days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+    try:
+        day_index = days_of_week.index(day_name)
+        return day_index
+    except ValueError:
+        print(f"Ошибка: {day_name} не является днём недели.")
+        return None
+
+
+
+async def time_until_event(sent=True):
+    # Получение текущего времени
+    current_time = datetime.now().time()
+    near_opis =''
+    near_geo =''
+    near_title = ''
+    nearest_time_delta = float('inf')
+    nearest_output_string = ""
+    # Рассчет времени до каждого мероприятия
+    for day, events in events_schedule.items():
+        for event_name, event_info in events.items():
+            event_time = event_info.get("🕐")
+
+            # Время мероприятия
+            event_datetime = datetime.combine((current_datetime + timedelta(days=(get_day_index(day) - current_datetime.weekday() + 7) % 7)).date(), event_time)
+            # Рассчет разницы во времени
+            time_difference = round((event_datetime - current_datetime).total_seconds() / 3600)
+
+            if time_difference < nearest_time_delta:
+                nearest_time_delta = time_difference
+                near_title ="🚀 "+ event_name
+                near_day = "🗓 " + translate_days_to_russian(day) + " 🕐"+ str(event_time)
+                near_geo = "📍 "+ event_info.get("📍")
+                near_opis = "🧘🏻‍♀️ "+ event_info.get("🧘🏻‍♀️")
+
+                # nearest_output_string = near_title + '\n'+ "🗓 "+ translate_days_to_russian(day) + str(near_time) + '\n'+ near_geo + '\n' + near_opis
+            if sent==True:
+                if time_difference == BigTimeLimit[1]:
+                    await send_messages_to_users(near_title,near_day,near_geo,near_opis)
+                if time_difference == ShortTimeLimit[1]:
+                    await send_reminder_to_users(near_title,near_day,near_geo,near_opis)
+            else:
+                pass
+
+    print('nearest_time_delta',nearest_time_delta,'near_day',near_title)
+    return near_title,near_day,near_geo,near_opis
+
 
 current_datetime = datetime.now()
 day_of_week_index = current_datetime.weekday()
-# day_of_week_index = 1
-day_indices = [list(calendar.day_name).index(day.capitalize()) for day in events_schedule]
-
-
-def find_nearest_day(current_day_index, schedule_indices):
-
-    # Получаем индекс текущего дня недели
-    current_day_index %= 7  # Если текущий индекс превышает 6, возвращаемся к началу недели
-    current_date = datetime.now()
-
-    # Устанавливаем русскую локаль
-    day_names = [
-        "понедельник", "вторник", "среду", "четверг", "пятницу", "субботу", "воскресенье"
-    ]
-
-    # Находим ближайший день недели относительно текущего дня
-    nearest_day_index = min(schedule_indices, key=lambda day_index: (day_index - current_day_index) % 7)
-
-    # Получаем имя ближайшего дня недели 
-    nearest_day_name = list(calendar.day_name)[nearest_day_index]
-
-    # Получаем время события
-    event_time = events_schedule[nearest_day_name]["🕐"]
-
-    # Сравниваем текущее время с временем события
-    if current_datetime.time() > event_time:
-        # Если текущее время больше времени события, берем следующий день
-        nearest_day_index = min(schedule_indices, key=lambda day_index: (day_index - (current_day_index+1)) % 7)
-        # Перенаправляем день недели 
-        nearest_day_name = list(calendar.day_name)[nearest_day_index]
-        event_time = events_schedule[nearest_day_name]["🕐"]    
-
-    # Calculate the difference in days to the nearest given day
-    days_difference = (nearest_day_index - current_day_index + 7) % 7
-    # Calculate the date of the nearest given day
-    nearest_day_date = current_date + timedelta(days=days_difference)
-
-        # Calculate the remaining time until the nearest day
-    remaining_time = (datetime.combine(nearest_day_date, event_time) - datetime.now()).total_seconds()
-    hours, remainder = divmod(remaining_time, 3600)
-    minutes, _ = divmod(remainder, 60)
-
-    # Format the result as hours and minutes
-    remaining_time_str = f"{int(hours)} hours and {int(minutes)} minutes"
-
-    # print('время до ближайшего мероприятия',hours)
-
-    nearest_day_name_rus = day_names[nearest_day_index]
-    formatted_string = "\n".join([f"{key}: {value}" for key, value in events_schedule[nearest_day_name].items()])
-
-    dayEvent = {nearest_day_name_rus:formatted_string}
-    dayEvent_str = "\n".join([f"{key}: {value}" for key, value in dayEvent.items()])
-
-    return hours,minutes,nearest_day_name,dayEvent_str
 
 
 # Enable logging
@@ -202,29 +225,24 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # CallbackQueries need to be answered, even if no notification to the user is needed
     await query.answer()
-    hours,minutes,eng_day,nearest_day = find_nearest_day(day_of_week_index, day_indices)
-    adress_line=nearest_day.split('\n')[1]
-    
-    if  hours < ShortTimeLimit[1]:
-        reply_markup = InlineKeyboardMarkup(keyboard3)
-    if  hours > ShortTimeLimit[1]:
-        reply_markup = InlineKeyboardMarkup(keyboard2)
 
     # Добавить пользователя в Google Таблицу
     if choice == "yes":
         if str(user_id) in user_ids:
             await context.bot.send_message(
                 chat_id=user_id,
-                text=f"Вы уже подписаны на мероприятия, напоминаем, ближайшее пройдет в \n 🗓 {nearest_day} через {hours} часов, {minutes} минут",reply_markup=reply_markup
+                text=f"Вы уже подписаны на мероприятия"
             )
         else:
+            near_title,near_day,near_geo,near_opis = await time_until_event(sent=False)
             await update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, choice==False, confirmation=False ,typeOf=True)
             await update_spreadsheet_data(context.application)    
             await context.bot.send_message(
                 chat_id=user_id,
-                text=f"Здорово! Ближайшее мероприятие пройдет в \n 🗓 {nearest_day} через {hours} часов, {minutes} минут" ,reply_markup=reply_markup
+                text=f"Спасибо, что подписались на наши события, теперь мы будем Вас уведомлять о предстоящих Сахадж - мероприятиях. \n Ближайшее {near_title} \n пройдет во {near_day} \n по адресу {near_geo}. \n Будем ждать! " ,
             )
             await context.bot.send_sticker(chat_id=user_id, sticker=agree_sticker_id )
+
 
 
     if choice == "otpis":
@@ -237,26 +255,27 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await context.bot.send_sticker(chat_id=user_id, sticker=yoga_sticker_id_by)
     
     if choice == "try":
+        near_title,near_day,near_geo,near_opis = await time_until_event(sent=False)
         await update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, choice=True, confirmation=False, typeOf=False)
         await update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, choice=True, confirmation=False, typeOf=True)
         await update_spreadsheet_data(context.application)    
         await context.bot.send_message(
             chat_id=user_id,
-            text=f"Здорово! Будем ждать. Ближайшее мероприятие пройдет в \n 🗓 {nearest_day} через {hours} часов, {minutes} минут. Отправим вам напоминание за 4 часа до мероприятия"
+            text=f"Здорово! Будем ждать вас завтра в \n {near_day} по адресу \n {near_geo}. Отправим вам напоминание за {ShortTimeLimit[1]} часа до начала занятий"
         )
         await send_notifications_to_group_try(user_name)
         await context.bot.send_sticker(chat_id=user_id, sticker=yoga_sticker_id_love)
     
     if choice == "confirm":
-
+        near_title,near_day,near_geo,near_opis = await time_until_event(sent=False)
+        time = near_day[1:]
         await update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, choice=True, confirmation=False, typeOf=False)
         await update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, choice=True, confirmation=True, typeOf=True)
         await update_spreadsheet_data(context.application)    
         await context.bot.send_message(
             chat_id=user_id,
-            text=f"Ваша Кундалини поднимается, мы Вас ждем через {hours} часов, {minutes} минут по адресу {adress_line}!",
+            text=f"Ваша Кундалини поднимается, увидимся в {near_geo} в 🕐{time}",
         )
-
         await send_notifications_to_group_confirm(user_name)
         await context.bot.send_sticker(chat_id=user_id, sticker=yoga_sticker_id)
 
@@ -273,19 +292,16 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def send_notifications_to_group_try(user_name):
-    hours,minutes,eng_day,nearest_day = find_nearest_day(day_of_week_index, day_indices)
-    text_line=nearest_day.split('\n')[0]
-    await bot.send_message(group_id, f"\n На {text_line} \n есть пердварительная запись от {user_name}")
+    near_title,near_day,near_geo,near_opis = await time_until_event(sent=False)
+    await bot.send_message(group_id, f"\n На {near_day} \n есть пердварительная запись от {user_name}")
 
 async def send_notifications_to_group_confirm(user_name):
-    hours,minutes,eng_day,nearest_day = find_nearest_day(day_of_week_index, day_indices)
-    text_line=nearest_day.split('\n')[0]
-    await bot.send_message(group_id, f"\n На {text_line} \n есть подтвержденная запись от {user_name}")
+    near_title,near_day,near_geo,near_opis = await time_until_event(sent=False)
+    await bot.send_message(group_id, f"\n На {near_day} \n есть подтвержденная запись от {user_name}")
 
 async def send_notifications_to_group_sorry(user_name):
-    hours,minutes,eng_day,nearest_day = find_nearest_day(day_of_week_index, day_indices)
-    text_line=nearest_day.split('\n')[0]
-    await bot.send_message(group_id, f"\n На {text_line} \n {user_name} не сможет придти")
+    near_title,near_day,near_geo,near_opis = await time_until_event(sent=False)
+    await bot.send_message(group_id, f"\n На {near_day} \n {user_name} не сможет придти")
 
 
 async def update_spreadsheet_data(application):
@@ -341,45 +357,34 @@ async def get_telegram_user_ids():
     # Фильтрация пользователей, оставляем только тех, у кого 3-ий столбец равен True
     filtered_users = [user_id for user_id, agrees in zip(user_ids, user_agrees) if agrees.lower() == 'true']
 
-    print("получаем всех пользователей из таблицы" ,user_ids)
-    print("получаем всех пользователей, кто собирается придти", filtered_users)
     return user_ids,filtered_users
 
 
-async def send_messages_to_users():
-    hours, minutes, eng_day, nearest_day = find_nearest_day(day_of_week_index, day_indices)
+async def send_messages_to_users(near_title,near_day,near_geo,near_opis):
+    # hours, minutes, eng_day, nearest_day = find_nearest_day(day_of_week_index)
     reply_markup = InlineKeyboardMarkup(keyboard2)
-    print('ближайшее мероприятие-',eng_day)
-    print('время до ближайшего мероприятия для собирающихся-',hours)
 
     try:
-        # Check if the message has already been sent
-        if BigTimeLimit[0] <= hours < BigTimeLimit[1]:
-            user_ids,filtered_users = await get_telegram_user_ids()
-            print('пользователи, кому отправляются сообщения',user_ids)
-            for user_id in user_ids:
-                # Send the reminder message
-                await bot.send_message(user_id, f"\n Напоминание на {nearest_day}. \n Мероприятие начнется через {hours} часов и {minutes} минут", reply_markup=reply_markup)
-                print(f"Напоминание отправлено пользователю {user_id}")
+        user_ids,filtered_users = await get_telegram_user_ids()
+        print("Напоминание за 24 часа")
+        for user_id in user_ids:
+            # Send the reminder message
+            await bot.send_message(user_id, f"\n Напоминание на завтра: \n {near_day} \n {near_title}, \n {near_geo}, \n {near_opis}", reply_markup=reply_markup)
+            # await bot.send_message(user_id, f"\n Напоминаем." , reply_markup=reply_markup)
     except Exception as e:
         print(f"Произошла ошибка при отправке сообщения: {e}")
 
 
 
-async def send_reminder_to_users():
-    hours, minutes, eng_day, nearest_day = find_nearest_day(day_of_week_index, day_indices)
+async def send_reminder_to_users(near_title,near_day,near_geo,near_opis):
     reply_markup = InlineKeyboardMarkup(keyboard3)
-    print('ближайшее мероприятие для собирающихся-',eng_day)
-    print('время до ближайшего мероприятия для уверенных-',hours)
 
     try:
-         if ShortTimeLimit[0] <= hours < ShortTimeLimit[1]:
-            user_ids,filtered_users = await get_telegram_user_ids()
-            print('пользователи, кому отправляются сообщения',user_ids)
-            for user_id in user_ids:
-                # Send the reminder message
-                await bot.send_message(user_id, f"\n Напоминание на {nearest_day}. \n Мероприятие начнется через {hours} часов и {minutes} минут", reply_markup=reply_markup)
-                print(f"Напоминание отправлено пользователю {user_id}")
+        user_ids,filtered_users = await get_telegram_user_ids()
+        print('Напоминание за 4 часа')
+        for user_id in user_ids:
+            # Send the reminder message
+            await bot.send_message(user_id, f"\n Напоминаем, сегодня, через {ShortTimeLimit[1]} часа начнуться занятия \n {near_day} \n {near_title}, \n {near_geo}, \n {near_opis}", reply_markup=reply_markup)
     except Exception as e:
         print(f"Произошла ошибка при отправке сообщения: {e}")
 
@@ -396,8 +401,7 @@ async def cleanup(application, send_messages_task):
 async def main_task():
     while True:
         # Запуск асинхронных функций с использованием asyncio.ensure_future
-        asyncio.ensure_future(send_messages_to_users())
-        asyncio.ensure_future(send_reminder_to_users())
+        asyncio.ensure_future(time_until_event(sent=True))
         await asyncio.sleep(sendTryTime)
 
 
@@ -409,7 +413,6 @@ def main() -> None:
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button))
-
     
     # Create a new event loop
     loop = asyncio.new_event_loop()
