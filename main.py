@@ -58,45 +58,62 @@ bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
 events_schedule = {
     "Tuesday": {
-        "Занятия для новичков": {
+        "Занятие для новичков": {
         "🕐": time(17, 30),
-        "📍": "Студия Йоги ОЙЙО, ул. Хользунова, 38/7",
+        "📍": "Студия Йоги ОЙЙО, ул. Хользунова, 38/7\n https://yandex.ru/maps/-/CDe-bHYN",
         "🧘🏻‍♀️": "Практика медитации"
         }
     },
 
     "Thursday": {
-        "Занятия для новичков": {
+        "Занятие для новичков": {
         "🕐": time(17, 00),
-        "📍": "Танцевальной пространство АНДЭР, ул. Бакунина, 2А (этаж 1)",
+        "📍": "Танцевальной пространство АНДЭР, ул. Бакунина, 2А, 2-й этаж \n https://yandex.ru/maps/-/CDe-bL~J",
         "🧘🏻‍♀️": "Практика медитации"
         }
     },
 
     "Friday": {
-        "Занятия для продолжающих": {
+        "Занятие для продолжающих": {
         "🕐": time(19, 0),
-        "📍": "Офис возле Галереи Чижова, ул. Никитинская, 42 оф. 515",
-        "🧘🏻‍♀️": "Практика медитации, методики очистки"
+        "📍": "Офис возле Галереи Чижова, ул. Никитинская, 42, 5-й этаж оф. 515 \n https://yandex.ru/maps/-/CDe-bTjS",
+        "🧘🏻‍♀️": "Практика медитации, методики очистки",
         }
     },
 
     "Saturday": {
-        "Занятия для новичков": {
+        "Занятие для новичков": {
         "🕐": time(19, 0),
-        "📍": "Офис, ул. 20-летия Октября, 59 оф.317",
+        "📍": "Офис, ул. 20-летия Октября, 59 оф.317, 3-й этаж \n https://yandex.ru/maps/-/CDe-b2ij",
         "🧘🏻‍♀️": "Практика медитации"
         },
 
-        "Занятия для продолжающих": {
+        "Занятие для продолжающих": {
         "🕐": time(17, 0),
-        "📍": "Офис, ул. 20-летия Октября, 59 оф.317",
-        "🧘🏻‍♀️": "Практика медитации, методики очистки"
+        "📍": "Офис, ул. 20-летия Октября, 59 оф.317, 3-й этаж \n https://yandex.ru/maps/-/CDe-b2ij",
+        "🧘🏻‍♀️": "Практика медитации, методики очистки",
         }
 
     }
 
 }
+
+def format_events_schedule(events_schedule):
+    result = ""
+    for day, events in events_schedule.items():
+        result += f"{translate_days_to_russian(day)}:\n"
+        for event_name, event_details in events.items():
+            result += f"  {event_name}:\n"
+            for key, value in event_details.items():
+                if isinstance(value, time):
+                    formatted_time = value.strftime("%H:%M")
+                    result += f"    {key}: {formatted_time}\n"
+                else:
+                    result += f"    {key}: {value}\n"
+        result += "\n"
+    return result
+
+
 
 def translate_days_to_russian(english_day):
     days_translation = {
@@ -141,8 +158,8 @@ async def time_until_event(sent=True):
             event_datetime = datetime.combine((current_datetime + timedelta(days=(get_day_index(day) - current_datetime.weekday() + 7) % 7)).date(), event_time)
             # Рассчет разницы во времени
             time_difference = round((event_datetime - current_datetime).total_seconds() / 3600)
-
-            if time_difference < nearest_time_delta:
+            print('time_difference',time_difference)
+            if time_difference < nearest_time_delta and time_difference > 0:
                 nearest_time_delta = time_difference
                 near_title ="🚀 "+ event_name
                 near_day = "🗓 " + translate_days_to_russian(day) + " 🕐"+ str(event_time)
@@ -178,13 +195,14 @@ logger = logging.getLogger(__name__)
 
 keyboard = [
     [
-        InlineKeyboardButton("Подписаться на рассылку", callback_data="yes")
+        InlineKeyboardButton("Подписаться на рассылку", callback_data="yes"),
+        InlineKeyboardButton("Расписание", callback_data="shelude")
     ]
 ]
 
 keyboard2 = [
     [
-        InlineKeyboardButton("Собираюсь пойти", callback_data="try"),
+        InlineKeyboardButton("Пойду на занятие", callback_data="try"),
         InlineKeyboardButton("Отписаться от рассылки", callback_data="otpis"),
     ]
 ]
@@ -211,7 +229,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("Привет! Вы подписаны на Сахадж мероприятия в Воронеже, хотите отписаться?", reply_markup=reply_markup)
     else:
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("Привет! Хотите подписаться на Сахадж мероприятия в Воронеже?", reply_markup=reply_markup)
+        await update.message.reply_text('''Привет! мы Сахаджа Йоги города Воронеж сделали этого бота, чтобы напомнить всем желающим где и когда проходят регулярные бесплатные занятия по Сахадж-медитации. 
+
+Вы можете подписаться на рассылку и бот будет присылать вам уведомления за 24 часа до начала занятий с информацией где и во сколько будет проходить ближайшее занятие, чтобы вы ничего не пропустили. Вы так же можете посмотреть актуальное расписание занятий, нажав на кнопку ниже 👇.''', reply_markup=reply_markup)
     
 
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -239,7 +259,11 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update_spreadsheet_data(context.application)    
             await context.bot.send_message(
                 chat_id=user_id,
-                text=f"Спасибо, что подписались на наши события, теперь мы будем Вас уведомлять о предстоящих Сахадж - мероприятиях. \n Ближайшее {near_title} \n пройдет во {near_day} \n по адресу {near_geo}. \n Будем ждать! " ,
+                text=f'''Спасибо, что подписались! Мы будем Вас уведомлять о предстоящих занятиях по медитации, что бы вы ничего не пропусстили. 
+                
+Ближайшее мероприятие: 
+
+{near_title} \n{near_day} \n{near_geo}.''' ,
             )
             await context.bot.send_sticker(chat_id=user_id, sticker=agree_sticker_id )
 
@@ -261,7 +285,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update_spreadsheet_data(context.application)    
         await context.bot.send_message(
             chat_id=user_id,
-            text=f"Здорово! Будем ждать вас завтра в \n {near_day} по адресу \n {near_geo}. Отправим вам напоминание за {ShortTimeLimit[1]} часа до начала занятий"
+            text=f"Здорово! Будем ждать вас завтра в \n{near_day} по адресу \n{near_geo}. \n⏰ Отправим вам напоминание за {ShortTimeLimit[1]} часа до начала занятий"
         )
         await send_notifications_to_group_try(user_name)
         await context.bot.send_sticker(chat_id=user_id, sticker=yoga_sticker_id_love)
@@ -289,6 +313,11 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         await send_notifications_to_group_sorry(user_name)
 
+    if choice == "shelude": 
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=format_events_schedule(events_schedule)
+        )
 
 
 async def send_notifications_to_group_try(user_name):
@@ -369,7 +398,7 @@ async def send_messages_to_users(near_title,near_day,near_geo,near_opis):
         print("Напоминание за 24 часа")
         for user_id in user_ids:
             # Send the reminder message
-            await bot.send_message(user_id, f"\n Напоминание на завтра: \n {near_day} \n {near_title}, \n {near_geo}, \n {near_opis}", reply_markup=reply_markup)
+            await bot.send_message(user_id, f"\n Напоминание на завтра: \n{near_day} \n{near_title}, \n{near_geo}, \n{near_opis} \n⚠️ Если вы собираетесь придти, пожалуйста нажмите кнопку - Пойду на занятие 👇 ", reply_markup=reply_markup)
             # await bot.send_message(user_id, f"\n Напоминаем." , reply_markup=reply_markup)
     except Exception as e:
         print(f"Произошла ошибка при отправке сообщения: {e}")
