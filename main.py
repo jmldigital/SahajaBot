@@ -33,7 +33,7 @@ env_path = '.env'
 
 send_messages_task = None
 
-sendTryTime = 550*6
+sendTryTime = 600*6
 BigTimeLimit = [23,24]
 ShortTimeLimit = [3,4]
 # gif = open('gif.gif', 'rb')
@@ -68,7 +68,7 @@ events_schedule = {
     "Thursday": {
         "Занятие для новичков": {
         "🕐": time(17, 00),
-        "📍": "Танцевальной пространство АНДЭР, ул. Бакунина, 2А, 2-й этаж \n https://yandex.ru/maps/-/CDe-bL~J",
+        "📍": "Танцевальное пространство АНДЭР, ул. Бакунина, 2А, 2-й этаж \n https://yandex.ru/maps/-/CDe-bL~J",
         "🧘🏻‍♀️": "Практика медитации"
         }
     },
@@ -81,18 +81,22 @@ events_schedule = {
         }
     },
 
-    "Saturday": {
+    "Monday": {
         "Занятие для новичков": {
-        "🕐": time(19, 0),
+        "🕐": time(15, 25),
         "📍": "Офис, ул. 20-летия Октября, 59 оф.317, 3-й этаж \n https://yandex.ru/maps/-/CDe-b2ij",
         "🧘🏻‍♀️": "Практика медитации"
         },
-
         "Занятие для продолжающих": {
-        "🕐": time(17, 0),
+        "🕐": time(14, 25),
         "📍": "Офис, ул. 20-летия Октября, 59 оф.317, 3-й этаж \n https://yandex.ru/maps/-/CDe-b2ij",
         "🧘🏻‍♀️": "Практика медитации, методики очистки",
         }
+        # "Занятие для мастеров": {
+        # "🕐": time(15, 35),
+        # "📍": "Офис, ул. 20-летия Октября, 59 оф.317, 3-й этаж \n https://yandex.ru/maps/-/CDe-b2ij",
+        # "🧘🏻‍♀️": "Практика медитации, методики очистки",
+        # }
 
     }
 
@@ -143,23 +147,27 @@ def get_day_index(day_name):
 
 async def time_until_event(sent=True):
     # Получение текущего времени
-    current_time = datetime.now().time()
+    current_time = datetime.now()
+    # day_of_week_index = current_time.weekday()
     near_opis =''
     near_geo =''
     near_title = ''
     nearest_time_delta = float('inf')
-    nearest_output_string = ""
     # Рассчет времени до каждого мероприятия
     for day, events in events_schedule.items():
         for event_name, event_info in events.items():
             event_time = event_info.get("🕐")
 
             # Время мероприятия
-            event_datetime = datetime.combine((current_datetime + timedelta(days=(get_day_index(day) - current_datetime.weekday() + 7) % 7)).date(), event_time)
+            event_datetime = datetime.combine((current_time + timedelta(days=(get_day_index(day) - current_time.weekday() + 7) % 7)).date(), event_time)
+            # event_datetime = event_datetime.total_seconds() / 3600
+            print('время мероприятия',type(event_datetime))
             # Рассчет разницы во времени
-            time_difference = round((event_datetime - current_datetime).total_seconds() / 3600)
-            print('time_difference',time_difference)
-            if time_difference < nearest_time_delta and time_difference > 0:
+            time_difference = (event_datetime - current_time).total_seconds() / 3600
+            print('сейчас-',current_time, '-time_difference',time_difference )
+
+            #Получаем ближайшее мероприятие
+            if time_difference  < nearest_time_delta and time_difference >= ShortTimeLimit[1]:
                 nearest_time_delta = time_difference
                 near_title ="🚀 "+ event_name
                 near_day = "🗓 " + translate_days_to_russian(day) + " 🕐"+ str(event_time)
@@ -168,19 +176,19 @@ async def time_until_event(sent=True):
 
                 # nearest_output_string = near_title + '\n'+ "🗓 "+ translate_days_to_russian(day) + str(near_time) + '\n'+ near_geo + '\n' + near_opis
             if sent==True:
-                if time_difference == BigTimeLimit[1]:
+                if time_difference //1 == BigTimeLimit[1]:
                     await send_messages_to_users(near_title,near_day,near_geo,near_opis)
-                if time_difference == ShortTimeLimit[1]:
+                if time_difference //1 == ShortTimeLimit[1]:
                     await send_reminder_to_users(near_title,near_day,near_geo,near_opis)
             else:
                 pass
 
-    print('nearest_time_delta',nearest_time_delta,'near_day',near_title)
+    print('ближайшая дельта',nearest_time_delta,'ближайший день',near_day,'ближайшее занятие',near_title)
     return near_title,near_day,near_geo,near_opis
 
 
-current_datetime = datetime.now()
-day_of_week_index = current_datetime.weekday()
+
+
 
 
 # Enable logging
@@ -202,9 +210,18 @@ keyboard = [
 
 keyboard2 = [
     [
-        InlineKeyboardButton("Пойду на занятие", callback_data="try"),
+        InlineKeyboardButton("Расписание", callback_data="shelude"),
         InlineKeyboardButton("Отписаться от рассылки", callback_data="otpis"),
     ]
+
+]
+
+keyboard22 = [
+    [
+        InlineKeyboardButton("Пойду на занятие", callback_data="try"),
+        InlineKeyboardButton("Расписание", callback_data="shelude"),
+    ],
+        [InlineKeyboardButton("Отписаться от рассылки", callback_data="otpis")]
 ]
 
 keyboard3 = [
@@ -259,7 +276,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update_spreadsheet_data(context.application)    
             await context.bot.send_message(
                 chat_id=user_id,
-                text=f'''Спасибо, что подписались! Мы будем Вас уведомлять о предстоящих занятиях по медитации, что бы вы ничего не пропусстили. 
+                text=f'''Спасибо, что подписались! Мы будем Вас уведомлять о предстоящих занятиях по медитации, что бы вы ничего не пропустили. 
                 
 Ближайшее мероприятие: 
 
@@ -391,7 +408,7 @@ async def get_telegram_user_ids():
 
 async def send_messages_to_users(near_title,near_day,near_geo,near_opis):
     # hours, minutes, eng_day, nearest_day = find_nearest_day(day_of_week_index)
-    reply_markup = InlineKeyboardMarkup(keyboard2)
+    reply_markup = InlineKeyboardMarkup(keyboard22)
 
     try:
         user_ids,filtered_users = await get_telegram_user_ids()
