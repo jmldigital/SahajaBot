@@ -26,6 +26,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Bot
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
 import os
+import json
 
 
 env_path = '.env'
@@ -55,6 +56,7 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GOOGLE_SHEETS_API_CREDENTIALS_JSON = os.getenv("GOOGLE_SHEETS_API_CREDENTIALS_JSON")
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
+invisible_space = "\u200B"
 
 events_schedule = {
     "Tuesday": {
@@ -102,21 +104,23 @@ events_schedule = {
 
 }
 
-def format_events_schedule(events_schedule):
-    result = ""
-    for day, events in events_schedule.items():
-        result += f"{translate_days_to_russian(day)}:\n"
-        for event_name, event_details in events.items():
-            result += f"  {event_name}:\n"
-            for key, value in event_details.items():
-                if isinstance(value, time):
-                    formatted_time = value.strftime("%H:%M")
-                    result += f"    {key}: {formatted_time}\n"
-                else:
-                    result += f"    {key}: {value}\n"
-        result += "\n"
-    return result
 
+def filter_calendar(calendar, filter_strings):
+
+    filter_strings_list = filter_strings.split(';')
+    filter_strings_list = [item for item in filter_strings_list if item.strip()]
+    # print('filter_strings_list',filter_strings_list)
+    filtered_events = {}
+
+    for filter_string in filter_strings_list:
+        day, event_name = filter_string.split(":")
+
+        # Проверка существования дня и мероприятия в календаре
+        if day in calendar and event_name in calendar[day]:
+            # Добавление события в отфильтрованный календарь
+            filtered_events.setdefault(day, {})[event_name] = calendar[day][event_name]
+
+    return filtered_events
 
 
 def translate_days_to_russian(english_day):
@@ -145,7 +149,7 @@ def get_day_index(day_name):
 
 
 
-async def time_until_event(sent=True):
+async def time_until_event():
     # Получение текущего времени
     current_time = datetime.now()
     # day_of_week_index = current_time.weekday()
@@ -157,6 +161,12 @@ async def time_until_event(sent=True):
     for day, events in events_schedule.items():
         for event_name, event_info in events.items():
             event_time = event_info.get("🕐")
+            event_geo = "📍 "+ event_info.get("📍")
+            event_opis = "🧘🏻‍♀️ "+ event_info.get("🧘🏻‍♀️")
+            event_day = "🗓 " + translate_days_to_russian(day) + " 🕐"+ str(event_time)
+            event_title ="🚀 "+ event_name
+            event_text=event_day + '\n'+ event_title + '\n' + event_geo + '\n' + event_opis
+
 
             # Время мероприятия
             event_datetime = datetime.combine((current_time + timedelta(days=(get_day_index(day) - current_time.weekday() + 7) % 7)).date(), event_time)
@@ -165,26 +175,26 @@ async def time_until_event(sent=True):
             # Рассчет разницы во времени
             time_difference = (event_datetime - current_time).total_seconds() / 3600
             print('сейчас-',current_time, '-time_difference',time_difference )
+            print('событие\n',day,'\n',event_name,'\n',event_info)
 
             #Получаем ближайшее мероприятие
-            if time_difference  < nearest_time_delta and time_difference >= ShortTimeLimit[1]:
-                nearest_time_delta = time_difference
-                near_title ="🚀 "+ event_name
-                near_day = "🗓 " + translate_days_to_russian(day) + " 🕐"+ str(event_time)
-                near_geo = "📍 "+ event_info.get("📍")
-                near_opis = "🧘🏻‍♀️ "+ event_info.get("🧘🏻‍♀️")
+            # if time_difference  < nearest_time_delta and time_difference >= ShortTimeLimit[1]:
+            #     nearest_time_delta = time_difference
+            #     near_title ="🚀 "+ event_name
+            #     near_day = "🗓 " + translate_days_to_russian(day) + " 🕐"+ str(event_time)
+            #     near_geo = "📍 "+ event_info.get("📍")
+            #     near_opis = "🧘🏻‍♀️ "+ event_info.get("🧘🏻‍♀️")
 
                 # nearest_output_string = near_title + '\n'+ "🗓 "+ translate_days_to_russian(day) + str(near_time) + '\n'+ near_geo + '\n' + near_opis
-            if sent==True:
-                if time_difference //1 == BigTimeLimit[1]:
-                    await send_messages_to_users(near_title,near_day,near_geo,near_opis)
-                if time_difference //1 == ShortTimeLimit[1]:
-                    await send_reminder_to_users(near_title,near_day,near_geo,near_opis)
-            else:
-                pass
 
-    print('ближайшая дельта',nearest_time_delta,'ближайший день',near_day,'ближайшее занятие',near_title)
-    return near_title,near_day,near_geo,near_opis
+            if time_difference //1 == BigTimeLimit[1]:
+                await send_messages_to_users(event_text)
+            if time_difference //1 == ShortTimeLimit[1]:
+                await send_reminder_to_users(event_text)
+
+
+    # print('ближайшая дельта',nearest_time_delta,'ближайший день',near_day,'ближайшее занятие',near_title)
+    return event_text
 
 
 
@@ -234,6 +244,16 @@ keyboard3 = [
     ]
 ]
 
+keyboard_back = [
+    [
+        InlineKeyboardButton("Мое расписание", callback_data="my_shelude"),
+        InlineKeyboardButton("Общее расписание", callback_data="shelude"),
+    ],
+    [
+        InlineKeyboardButton("🔕 Отписаться от этого дня'", callback_data="otpis_day"),
+    ]
+]
+
 # Define a few command handlers. These usually take the two arguments update and
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends a message with three inline buttons attached."""
@@ -249,19 +269,90 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text('''Привет! мы Сахаджа Йоги города Воронеж сделали этого бота, чтобы напомнить всем желающим где и когда проходят регулярные бесплатные занятия по Сахадж-медитации. 
 
 Вы можете подписаться на рассылку и бот будет присылать вам уведомления за 24 часа до начала занятий с информацией где и во сколько будет проходить ближайшее занятие, чтобы вы ничего не пропустили. Вы так же можете посмотреть актуальное расписание занятий, нажав на кнопку ниже 👇.''', reply_markup=reply_markup)
-    
+
+
+
+def format_events_schedule(events_schedule,Subscribe=True):
+    messages_with_keyboard = []
+
+    for day, events in events_schedule.items():
+        for event_name, event_details in events.items():
+            message = f"{translate_days_to_russian(day)} - {event_name}:\n"
+
+            # Ширина первого столбца
+            column_width = 0
+
+            for key, value in event_details.items():
+                if isinstance(value, time):
+                    formatted_time = value.strftime("%H:%M")
+                    message += f"{key.ljust(column_width)}: {formatted_time}\n"
+                else:
+                    message += f"{key.ljust(column_width)}: {value}\n"
+
+            # Создаем кнопку для текущего события
+            if Subscribe==True:
+                button_text = "Подписаться на " + translate_days_to_russian(day) + '🔔'
+                button = InlineKeyboardButton(button_text, callback_data=f"{day+event_name}")
+            else:
+                button_text = "Отписаться от " + translate_days_to_russian(day) + '🔕'
+                button = InlineKeyboardButton(button_text, callback_data=f"otpis_{day+event_name}")
+
+            keyboard = [[button]]
+            # Добавляем текст события и кнопку в список
+            messages_with_keyboard.append((message, InlineKeyboardMarkup(keyboard)))
+
+    return messages_with_keyboard
+
 
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+    user_shelude={}
     """Parses the CallbackQuery and updates the message text."""
     query = update.callback_query
     user_id = query.from_user.id
-    user_ids,filtered_users = await get_telegram_user_ids()
+    user_ids,users_shelude_strings = await get_telegram_user_ids()
     user_name = query.from_user.username
     choice = query.data
-
-
     # CallbackQueries need to be answered, even if no notification to the user is needed
     await query.answer()
+
+    for day, events in events_schedule.items():
+        for event_name,event_details in events.items():
+            if choice == f"{day+event_name}":
+                # user_shelude[day] = event_name
+                user_shelude = day+":"+event_name
+                # print('добавляем календарь пользователя',user_shelude)
+                await update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, user_shelude,add=True)
+                await context.bot.send_message(
+                chat_id=user_id,
+                text=f'Вы подписались на {event_name} в {translate_days_to_russian(day)}. Теперь вы будете получать уведомления накануне, чтобы его не пропустить.', reply_markup=InlineKeyboardMarkup(keyboard_back) 
+            )
+                
+    for day, events in events_schedule.items():
+        for event_name,event_details in events.items():
+            if choice == f"otpis_{day+event_name}":
+                # user_shelude[day] = event_name
+                user_shelude = day+":"+event_name
+                # print('добавляем календарь пользователя',user_shelude)
+                await update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, user_shelude,add=False)
+                await context.bot.send_message(
+                chat_id=user_id,
+                text=f'Вы отписались от {event_name} в {translate_days_to_russian(day)}. Теперь уведомления на этот день не будут приходить вам.', reply_markup=InlineKeyboardMarkup(keyboard_back) 
+            )
+
+    if choice == 'my_shelude':
+        # Получаем список сообщений с клавиатурой для каждого события
+        user_shelude_string = await get_user_sheluds(user_id)
+        user_schedule = filter_calendar(events_schedule,user_shelude_string)
+        messages_with_keyboard = format_events_schedule(user_schedule,Subscribe=False)
+        # Отправляем каждое сообщение с клавиатурой
+        for message, reply_markup in messages_with_keyboard:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=message,
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
 
     # Добавить пользователя в Google Таблицу
     if choice == "yes":
@@ -276,13 +367,10 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update_spreadsheet_data(context.application)    
             await context.bot.send_message(
                 chat_id=user_id,
-                text=f'''Спасибо, что подписались! Мы будем Вас уведомлять о предстоящих занятиях по медитации, что бы вы ничего не пропустили. 
-                
-Ближайшее мероприятие: 
-
-{near_title} \n{near_day} \n{near_geo}.''' ,
+                text=f'''Спасибо, что подписались! Мы будем Вас уведомлять о предстоящих занятиях по медитации, что бы вы ничего не пропустили.''' ,
             )
             await context.bot.send_sticker(chat_id=user_id, sticker=agree_sticker_id )
+
 
 
 
@@ -330,11 +418,21 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         await send_notifications_to_group_sorry(user_name)
 
-    if choice == "shelude": 
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=format_events_schedule(events_schedule)
-        )
+    if choice == "shelude":
+            # Получаем список сообщений с клавиатурой для каждого события
+            messages_with_keyboard = format_events_schedule(events_schedule,Subscribe=True)
+            # Отправляем каждое сообщение с клавиатурой
+            for message, reply_markup in messages_with_keyboard:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=message,
+                    parse_mode='Markdown',
+                    reply_markup=reply_markup
+                )
+
+    
+
+
 
 
 async def send_notifications_to_group_try(user_name):
@@ -355,28 +453,45 @@ async def update_spreadsheet_data(application):
     await get_telegram_user_ids()
 
 
-# Добавляем тех пользователей которые согласились в таблицу
-async def update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, choice, confirmation, typeOf):
+# Добавляем пользователей и их выбор в таблицу
+async def update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, user_shelude,add=True):
     # Аутентификация в Google Sheets
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     credentials = ServiceAccountCredentials.from_json_keyfile_name(GOOGLE_SHEETS_API_CREDENTIALS_JSON, scope)
     gc = gspread.authorize(credentials)
     spreadsheet = gc.open_by_key(GOOGLE_SHEETS_SPREADSHEET_ID)
-
-    # Получение активного листа (первого листа в таблице)
+    user_ids,user_sheludes =  await get_telegram_user_ids()
     sheet = spreadsheet.get_worksheet(0)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    all_data = sheet.get_all_values()
+    user_exists = any(str(user_id) == user for user in user_ids)
 
-    # Выбираем лист таблицы
-    row_data = [user_id, user_name, choice, confirmation, timestamp]
+    if user_exists:
+        # print('пользователь есть',user_exists)
+        updated_data = []
+        for index, entry in enumerate(all_data):
+            if entry[0] == str(user_id):
+                if add:
+                    if user_shelude in entry[2]:
+                        pass
+                    else:
+                        entry[2] += user_shelude+';'
+                        sheet.update(f'A{index + 1}:C{index + 1}', [entry], value_input_option='USER_ENTERED')
 
-    # Добавляем данные
-    if typeOf:
-        sheet.append_row(row_data)
+
+                else:
+                    if user_shelude in entry[2]:
+                        entry[2] = entry[2].replace(user_shelude, '')
+                        sheet.update(f'A{index + 1}:C{index + 1}', [entry], value_input_option='USER_ENTERED')
+                        # print("новое расписание бузе lyz",entry[2])
+                    else:
+                        pass                            
+                
+                break  # Завершаем цикл после обновления
     else:
-        cell = sheet.find(str(user_id))
-        sheet.delete_row(cell.row)
-
+        # print('такого пользователя нет')
+        sheet.append_row([user_id, user_name, user_shelude])
+    
 
 
 
@@ -398,15 +513,43 @@ async def get_telegram_user_ids():
 
     # Получение списка ID пользователей
     user_ids = await asyncio.to_thread(sheet.col_values, 1)
-    user_agrees = await asyncio.to_thread(sheet.col_values, 3)
+    user_sheludes = await asyncio.to_thread(sheet.col_values, 3)
 
     # Фильтрация пользователей, оставляем только тех, у кого 3-ий столбец равен True
-    filtered_users = [user_id for user_id, agrees in zip(user_ids, user_agrees) if agrees.lower() == 'true']
+    # filtered_users = [user_id for user_id, agrees in zip(user_ids, user_agrees) if agrees.lower() == 'true']
 
-    return user_ids,filtered_users
+    return user_ids,user_sheludes
 
 
-async def send_messages_to_users(near_title,near_day,near_geo,near_opis):
+# Получаем расписание пользвоателя
+async def get_user_sheluds(user_id):
+    # Загрузка учетных данных
+
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    credentials = ServiceAccountCredentials.from_json_keyfile_name(GOOGLE_SHEETS_API_CREDENTIALS_JSON, scope)
+    gc = gspread.authorize(credentials)
+    spreadsheet = gc.open_by_key(GOOGLE_SHEETS_SPREADSHEET_ID)
+
+    # Аутентификация и открытие таблицы по идентификатору
+    gc = gspread.authorize(credentials)
+    spreadsheet = gc.open_by_key(GOOGLE_SHEETS_SPREADSHEET_ID)
+
+    # Получение активного листа (первого листа в таблице)
+    sheet = spreadsheet.get_worksheet(0)
+    all_data = sheet.get_all_values()
+
+    for entry in all_data:
+        # print(entry[2] )
+        if entry[0] == str(user_id):
+            user_shelude = entry[2]
+        else: 
+            user_shelude =''
+
+
+    return user_shelude
+
+
+async def send_messages_to_users(event_text):
     # hours, minutes, eng_day, nearest_day = find_nearest_day(day_of_week_index)
     reply_markup = InlineKeyboardMarkup(keyboard22)
 
@@ -415,14 +558,14 @@ async def send_messages_to_users(near_title,near_day,near_geo,near_opis):
         print("Напоминание за 24 часа")
         for user_id in user_ids:
             # Send the reminder message
-            await bot.send_message(user_id, f"\n Напоминание на завтра: \n{near_day} \n{near_title}, \n{near_geo}, \n{near_opis} \n⚠️ Если вы собираетесь придти, пожалуйста нажмите кнопку - Пойду на занятие 👇 ", reply_markup=reply_markup)
+            await bot.send_message(user_id, f"\n Напоминание на завтра: \n {event_text} \n⚠️ Если вы собираетесь придти, пожалуйста нажмите кнопку - Пойду на занятие 👇 ", reply_markup=reply_markup)
             # await bot.send_message(user_id, f"\n Напоминаем." , reply_markup=reply_markup)
     except Exception as e:
         print(f"Произошла ошибка при отправке сообщения: {e}")
 
 
 
-async def send_reminder_to_users(near_title,near_day,near_geo,near_opis):
+async def send_reminder_to_users(event_text):
     reply_markup = InlineKeyboardMarkup(keyboard3)
 
     try:
@@ -430,7 +573,7 @@ async def send_reminder_to_users(near_title,near_day,near_geo,near_opis):
         print('Напоминание за 4 часа')
         for user_id in user_ids:
             # Send the reminder message
-            await bot.send_message(user_id, f"\n Напоминаем, сегодня, через {ShortTimeLimit[1]} часа начнуться занятия \n {near_day} \n {near_title}, \n {near_geo}, \n {near_opis}", reply_markup=reply_markup)
+            await bot.send_message(user_id, f"\n Напоминаем, сегодня, через {ShortTimeLimit[1]} часа начнуться занятия \n {event_text}", reply_markup=reply_markup)
     except Exception as e:
         print(f"Произошла ошибка при отправке сообщения: {e}")
 
@@ -447,7 +590,7 @@ async def cleanup(application, send_messages_task):
 async def main_task():
     while True:
         # Запуск асинхронных функций с использованием asyncio.ensure_future
-        asyncio.ensure_future(time_until_event(sent=True))
+        asyncio.ensure_future(time_until_event())
         await asyncio.sleep(sendTryTime)
 
 
