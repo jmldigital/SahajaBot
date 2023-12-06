@@ -58,7 +58,7 @@ bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
 events_schedule = {
     "Tuesday": {
-        "Занятие для новичков": {
+        "👶 Новичковые": {
         "🕐": time(17, 30),
         "📍": "Студия Йоги ОЙЙО, ул. Хользунова, 38/7\n https://yandex.ru/maps/-/CDe-bHYN",
         "🧘🏻‍♀️": "Практика медитации"
@@ -66,7 +66,7 @@ events_schedule = {
     },
 
     "Thursday": {
-        "Занятие для новичков": {
+        "👶 Новичковые": {
         "🕐": time(17, 00),
         "📍": "Танцевальное пространство АНДЭР, ул. Бакунина, 2А, 2-й этаж \n https://yandex.ru/maps/-/CDe-bL~J",
         "🧘🏻‍♀️": "Практика медитации"
@@ -74,7 +74,7 @@ events_schedule = {
     },
 
     "Friday": {
-        "Занятие для продолжающих": {
+        "🧘🏻‍♂️ Продолжающие": {
         "🕐": time(19, 0),
         "📍": "Офис возле Галереи Чижова, ул. Никитинская, 42, 5-й этаж оф. 515 \n https://yandex.ru/maps/-/CDe-bTjS",
         "🧘🏻‍♀️": "Практика медитации, методики очистки",
@@ -82,12 +82,12 @@ events_schedule = {
     },
 
     "Saturday": {
-        "Занятие для новичков": {
+        "👶 Новичковые": {
         "🕐": time(16, 00),
         "📍": "Офис, ул. 20-летия Октября, 59 оф.317, 3-й этаж \n https://yandex.ru/maps/-/CDe-b2ij",
         "🧘🏻‍♀️": "Практика медитации"
         },
-        "Занятие для продолжающих": {
+        "🧘🏻‍♂️ Продолжающие": {
         "🕐": time(17, 00),
         "📍": "Офис, ул. 20-летия Октября, 59 оф.317, 3-й этаж \n https://yandex.ru/maps/-/CDe-b2ij",
         "🧘🏻‍♀️": "Практика медитации, методики очистки",
@@ -239,40 +239,38 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 def format_events_schedule(events_schedule,Subscribe=True):
-    messages_with_keyboard = []
+    buttons = []
 
     for day, events in events_schedule.items():
         for event_name, event_details in events.items():
-            message = f"{translate_days_to_russian(day)} - {event_name}:\n"
-
-            # Ширина первого столбца
-            column_width = 0
-
-            for key, value in event_details.items():
-                if isinstance(value, time):
-                    formatted_time = value.strftime("%H:%M")
-                    message += f"{key.ljust(column_width)}: {formatted_time}\n"
-                else:
-                    message += f"{key.ljust(column_width)}: {value}\n"
-
             # Создаем кнопку для текущего события
-            if Subscribe==True:
-                button_text = "Подписаться на " + translate_days_to_russian(day) + '🔔'
-                buttons = [InlineKeyboardButton(button_text, callback_data=f"{day+event_name}")]
-                keyboard = [buttons]
+            event_time = event_details.get("🕐", None)
+            button_text = f"{translate_days_to_russian(day)} {event_name} {event_time}"
+            if Subscribe:
+                callback_data = f"{day}_{event_name}"
             else:
-                button_text = "Отписаться от " + translate_days_to_russian(day) + ' 🔕'
-                button_row1 = [InlineKeyboardButton(button_text, callback_data=f"otpis_{day+event_name}")]
-                button_row2 = keyboard_start_old[0]
-                buttons = [button_row1,button_row2]
-                keyboard = buttons
+                callback_data = f"my_{day}_{event_name}"
+            buttons.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
 
-            
-            
+    keyboard_markup = InlineKeyboardMarkup(buttons)
+    return keyboard_markup
 
-            messages_with_keyboard.append((message, InlineKeyboardMarkup(keyboard)))
 
-    return messages_with_keyboard
+def create_event_button(day, event_name, events_schedule, podpis=True):
+    event_details = events_schedule.get(day, {}).get(event_name, {})
+    
+    # Извлекаем время мероприятия из словаря event_details
+    event_time = event_details.get("🕐", None)
+
+    # Создаем кнопку для текущего события
+    if podpis:
+        button_text = f"Подписаться на {event_name} в {translate_days_to_russian(day)} 🔔"
+        callback_data = f"podpis_{day}_{event_name}"
+    else:
+        button_text = f"Отписаться от {event_name} в {translate_days_to_russian(day)} 🔕"
+        callback_data = f"otpis_{day}_{event_name}"
+    return InlineKeyboardButton(button_text, callback_data=callback_data)
+
 
 
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -287,10 +285,53 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # CallbackQueries need to be answered, even if no notification to the user is needed
     await query.answer()
 
+    #Показываем дополнительну  ю информацию о дне занятия
+    for day, events in events_schedule.items():
+        for event_name,event_details in events.items():
+            if choice == f"{day}_{event_name}":
+                button = create_event_button(day, event_name, events_schedule,podpis=True)
+                # print('button',button)
+                event_time = event_details.get("🕐")
+                event_geo = "📍 "+ event_details.get("📍")
+                event_opis = "🧘🏻‍♀️ "+ event_details.get("🧘🏻‍♀️")
+                event_text='\n' + "🕐" + str(event_time) + '\n'+ event_geo + '\n' + event_opis
+                await context.bot.send_message(
+                chat_id=user_id,
+                text=f'{event_name}:\n🗓 {translate_days_to_russian(day)} {event_text}', reply_markup=InlineKeyboardMarkup([[button],keyboard_start_old[0]])
+            )
+
+     #Показываем распиание пользователя           
+    for day, events in events_schedule.items():
+        for event_name,event_details in events.items():
+            if choice == f"my_{day}_{event_name}":
+                button = create_event_button(day, event_name, events_schedule,podpis=False)
+                # print('button my',button)
+                event_time = event_details.get("🕐")
+                event_geo = "📍 "+ event_details.get("📍")
+                event_opis = "🧘🏻‍♀️ "+ event_details.get("🧘🏻‍♀️")
+                event_text='\n' + "🕐" + str(event_time) + '\n'+ event_geo + '\n' + event_opis
+                await context.bot.send_message(
+                chat_id=user_id,
+                text=f'{event_name}:\n🗓 {translate_days_to_russian(day)} {event_text}', reply_markup=InlineKeyboardMarkup([[button],keyboard_start_old[0]])
+            )
+                
+
+    #Отписка от дня пользователя       
+    for day, events in events_schedule.items():
+        for event_name,event_details in events.items():
+            if choice == f"otpis_{day}_{event_name}":
+                user_shelude = day+":"+event_name
+                await update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, user_shelude,add=False)
+                await context.bot.send_message(
+                chat_id=user_id,
+                text=f'Вы отписались от {event_name} в {translate_days_to_russian(day)}. Теперь уведомления на этот день не будут приходить вам.', reply_markup=InlineKeyboardMarkup(keyboard_start_old) 
+            )
+                
+
     #Подписка пользователя
     for day, events in events_schedule.items():
         for event_name,event_details in events.items():
-            if choice == f"{day+event_name}":
+            if choice == f"podpis_{day}_{event_name}":
                 # user_shelude[day] = event_name
                 user_shelude = day+":"+event_name+';'
                 # print('добавляем календарь пользователя',user_shelude)
@@ -300,18 +341,15 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 text=f'Вы подписались на {event_name} в {translate_days_to_russian(day)}. Теперь вы будете получать уведомления накануне, чтобы ничего не пропустить.', reply_markup=InlineKeyboardMarkup(keyboard_start_old) 
             )
 
-    #Отписка от дня пользователя       
-    for day, events in events_schedule.items():
-        for event_name,event_details in events.items():
-            if choice == f"otpis_{day+event_name}":
-                # user_shelude[day] = event_name
-                user_shelude = day+":"+event_name
-                # print('добавляем календарь пользователя',user_shelude)
-                await update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, user_shelude,add=False)
-                await context.bot.send_message(
-                chat_id=user_id,
-                text=f'Вы отписались от {event_name} в {translate_days_to_russian(day)}. Теперь уведомления на этот день не будут приходить вам.', reply_markup=InlineKeyboardMarkup(keyboard_start_old) 
-            )
+
+    if choice == "shelude":
+        # Получаем список сообщений с клавиатурой для каждого события
+        keyboard = format_events_schedule(events_schedule,Subscribe=True)
+    # Отправляем каждое сообщение с клавиатурой
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=f"🗓 Общее расписание \n Выберите день, чтобы узнать детали или подписаться",reply_markup=keyboard
+        )
 
     if choice == 'my_shelude':
         # Получаем список сообщений с клавиатурой для каждого события
@@ -319,15 +357,12 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user_schedule = filter_calendar(events_schedule,user_shelude_string)
         # print('расписание пользователя',user_shelude_string)
         if user_shelude_string:
-            messages_with_keyboard = format_events_schedule(user_schedule,Subscribe=False)
+            keyboard = format_events_schedule(user_schedule,Subscribe=False)
             # Отправляем каждое сообщение с клавиатурой
-            for message, reply_markup in messages_with_keyboard:
-                await context.bot.send_message(
-                    chat_id=user_id,
-                    text=message,
-                    parse_mode='Markdown',
-                    reply_markup=reply_markup
-                )
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=f"⭐️ Ваше расписание занятий",reply_markup=keyboard
+            )
         else:
             print('расписание пользователя пустое',user_shelude_string)
             await context.bot.send_message(
@@ -348,7 +383,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if choice == "confirm": 
         await context.bot.send_message(
             chat_id=user_id,
-            text=f"Ваша Кундалини поднимается, увидимся через 🕐{time} часа",
+            text=f"Ваша Кундалини поднимается, увидимся на занятии!",
         )
         await send_notifications_to_group_confirm(user_name)
         await context.bot.send_sticker(chat_id=user_id, sticker=yoga_sticker_id)
@@ -362,20 +397,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             text=f"Ничего страшного, приходите на следующее занятие, мы Вас оповестим о нем заранее!"
         )
         await send_notifications_to_group_sorry(user_name)
-
-    if choice == "shelude":
-            # Получаем список сообщений с клавиатурой для каждого события
-            messages_with_keyboard = format_events_schedule(events_schedule,Subscribe=True)
-            # Отправляем каждое сообщение с клавиатурой
-            for message, reply_markup in messages_with_keyboard:
-                await context.bot.send_message(
-                    chat_id=user_id,
-                    text=message,
-                    parse_mode='Markdown',
-                    reply_markup=reply_markup
-                )
-
-    
 
 
 
@@ -413,10 +434,14 @@ async def update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, 
         for index, entry in enumerate(all_data):
             if entry[0] == str(user_id):
                 if add:
-                    if user_shelude in entry[2]:
-                        pass
-                    else:
-                        entry[2] += user_shelude
+                    try:
+                        if user_shelude in entry[2]:
+                            pass
+                        else:
+                            entry[2] += user_shelude
+                            sheet.update(f'A{index + 1}:C{index + 1}', [entry], value_input_option='USER_ENTERED')
+                    except:
+                        entry = [entry[0], entry[1], user_shelude]
                         sheet.update(f'A{index + 1}:C{index + 1}', [entry], value_input_option='USER_ENTERED')
                 else:
                     if user_shelude in entry[2]:
@@ -477,7 +502,10 @@ async def get_user_sheluds(user_id):
 
     for entry in all_data:
         if entry[0] == str(user_id):
-            user_shelude = entry[2]
+            try:
+                user_shelude = entry[2]
+            except:
+                user_shelude=''
             # print('не пустое расписание',user_shelude)
         else: 
             # print('пустое расписание')
