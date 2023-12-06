@@ -67,7 +67,7 @@ events_schedule = {
 
     "Thursday": {
         "Занятие для новичков": {
-        "🕐": time(14, 00),
+        "🕐": time(17, 00),
         "📍": "Танцевальное пространство АНДЭР, ул. Бакунина, 2А, 2-й этаж \n https://yandex.ru/maps/-/CDe-bL~J",
         "🧘🏻‍♀️": "Практика медитации"
         }
@@ -317,7 +317,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # Получаем список сообщений с клавиатурой для каждого события
         user_shelude_string = await get_user_sheluds(user_id)
         user_schedule = filter_calendar(events_schedule,user_shelude_string)
-        if user_schedule:
+        # print('расписание пользователя',user_shelude_string)
+        if user_shelude_string:
             messages_with_keyboard = format_events_schedule(user_schedule,Subscribe=False)
             # Отправляем каждое сообщение с клавиатурой
             for message, reply_markup in messages_with_keyboard:
@@ -328,6 +329,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     reply_markup=reply_markup
                 )
         else:
+            print('расписание пользователя пустое',user_shelude_string)
             await context.bot.send_message(
             chat_id=user_id,
             text=f"Вы не подписанны ни на один день занятий, пожалуйста выберите любой подходящий вам день из расписания.",
@@ -459,6 +461,7 @@ async def get_telegram_user_ids():
 
 # Получаем расписание пользвоателя
 async def get_user_sheluds(user_id):
+    user_shelude =''
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     credentials = ServiceAccountCredentials.from_json_keyfile_name(GOOGLE_SHEETS_API_CREDENTIALS_JSON, scope)
     gc = gspread.authorize(credentials)
@@ -475,8 +478,10 @@ async def get_user_sheluds(user_id):
     for entry in all_data:
         if entry[0] == str(user_id):
             user_shelude = entry[2]
+            # print('не пустое расписание',user_shelude)
         else: 
-            user_shelude =''
+            # print('пустое расписание')
+            user_shelude +=''
 
     return user_shelude
 
