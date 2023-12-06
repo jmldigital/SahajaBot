@@ -345,7 +345,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if choice == "shelude":
         # Получаем список сообщений с клавиатурой для каждого события
         keyboard = format_events_schedule(events_schedule,Subscribe=True)
-    # Отправляем каждое сообщение с клавиатурой
+        # Отправляем каждое сообщение с клавиатурой
         await context.bot.send_message(
             chat_id=user_id,
             text=f"🗓 Общее расписание \n Выберите день, чтобы узнать детали или подписаться",reply_markup=keyboard
@@ -388,10 +388,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await send_notifications_to_group_confirm(user_name)
         await context.bot.send_sticker(chat_id=user_id, sticker=yoga_sticker_id)
 
-    if choice == "sorry":
-        await update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, choice=True, confirmation=False, typeOf=False)
-        await update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, choice=False, confirmation=False, typeOf=True)
-        await update_spreadsheet_data(context.application)    
+    if choice == "sorry": 
         await context.bot.send_message(
             chat_id=user_id,
             text=f"Ничего страшного, приходите на следующее занятие, мы Вас оповестим о нем заранее!"

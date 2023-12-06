@@ -42,8 +42,8 @@ $commands = @(
     "cd bot",
     "pkill screen",
    "screen -dmS new_session_name bash",
-    "screen -S new_session_name -X exec bash -c 'cd bot && source env/bin/activate && python main.py'",
-    "screen -list"
+   "screen -S new_session_name -X exec bash -c 'cd bot && source env/bin/activate && python main.py'",
+   "screen -list"
 )
 
 foreach ($command in $commands) {
