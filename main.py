@@ -2,18 +2,6 @@
 # pylint: disable=unused-argument
 # This program is dedicated to the public domain under the CC0 license.
 
-"""
-Simple Bot to reply to Telegram messages.
-
-First, a few handler functions are defined. Then, those functions are passed to
-the Application and registered at their respective places.
-Then, the bot is started and runs until we press Ctrl-C on the command line.
-
-Usage:
-Basic Echobot example, repeats messages.
-Press Ctrl-C on the command line or send a signal to the process to stop the
-bot.
-"""
 # import gspread_asyncio
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -169,7 +157,7 @@ async def time_until_event():
             if time_difference //1 == BigTimeLimit[1]:
                 await send_messages_to_users(event_text,event_shelude)
             if time_difference //1 == ShortTimeLimit[1]:
-                await send_reminder_to_users(event_text)
+                await send_reminder_to_users(event_text,event_shelude)
 
     # print('ближайшая дельта',nearest_time_delta,'ближайший день',near_day,'ближайшее занятие',near_title)
     return event_day
@@ -237,7 +225,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 Вы можете подписаться на рассылку на удобные для вас дни недели для посещения 👇, и бот будет присылать вам уведомления за 24 часа до начала занятий в выбранные дни, чтобы вы ничего не пропустили.''', reply_markup=reply_markup)
 
 
-
+# Возвращает кнопки по событиям календаря
 def format_events_schedule(events_schedule,Subscribe=True):
     buttons = []
 
@@ -256,11 +244,9 @@ def format_events_schedule(events_schedule,Subscribe=True):
     return keyboard_markup
 
 
+#Создает кнопку к выбранному раскрывающемуся мероприятию для подписки или отписки
 def create_event_button(day, event_name, events_schedule, podpis=True):
     event_details = events_schedule.get(day, {}).get(event_name, {})
-    
-    # Извлекаем время мероприятия из словаря event_details
-    event_time = event_details.get("🕐", None)
 
     # Создаем кнопку для текущего события
     if podpis:
@@ -342,6 +328,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             )
 
 
+    #Показываем общий календарь
     if choice == "shelude":
         # Получаем список сообщений с клавиатурой для каждого события
         keyboard = format_events_schedule(events_schedule,Subscribe=True)
@@ -350,7 +337,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             chat_id=user_id,
             text=f"🗓 Общее расписание \n Выберите день, чтобы узнать детали или подписаться",reply_markup=keyboard
         )
-
+    #Показываем персональный календарь
     if choice == 'my_shelude':
         # Получаем список сообщений с клавиатурой для каждого события
         user_shelude_string = await get_user_sheluds(user_id)
@@ -407,10 +394,11 @@ async def send_notifications_to_group_confirm(user_name):
 async def send_notifications_to_group_sorry(user_name):
     await bot.send_message(group_id, f"\n {user_name} сегодня не сможет придти")
 
-
 async def update_spreadsheet_data(application):
     # global send_messages_task
     await get_telegram_user_ids()
+
+
 
 
 # Добавляем пользователей и их выбор в таблицу
@@ -455,7 +443,7 @@ async def update_spreadsheet(user_id, user_name,  GOOGLE_SHEETS_SPREADSHEET_ID, 
 
 
 
-# Получаем согласившихся пользователей из таблицы
+# Получаем пользователей из таблицы
 async def get_telegram_user_ids():
     # Загрузка учетных данных
 
@@ -481,7 +469,7 @@ async def get_telegram_user_ids():
     return user_ids,user_sheludes
 
 
-# Получаем расписание пользвоателя
+# Получаем расписание конкретного пользвоателя
 async def get_user_sheluds(user_id):
     user_shelude =''
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -531,13 +519,16 @@ async def send_messages_to_users(event_text,event_shelude):
 
 
 
-async def send_reminder_to_users(event_text):
+async def send_reminder_to_users(event_text,event_shelude):
     reply_markup = InlineKeyboardMarkup(keyboard3)
 
     try:
-        user_ids,filtered_users = await get_telegram_user_ids()
+        user_ids,user_shelude_string = await get_telegram_user_ids()
+        user_schedule_dict = dict(zip(user_ids, user_shelude_string))
+
+        user_ids_filtred = [user_id for user_id, schedule in user_schedule_dict.items() if event_shelude in schedule]
         print('Напоминание за 4 часа')
-        for user_id in user_ids:
+        for user_id in user_ids_filtred:
             # Send the reminder message
             await bot.send_message(user_id, f"\n Напоминаем, сегодня, через {ShortTimeLimit[1]} часа начнуться занятия \n {event_text}", reply_markup=reply_markup)
     except Exception as e:
